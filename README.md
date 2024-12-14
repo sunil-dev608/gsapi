@@ -1,4 +1,4 @@
-# gsapi
+# Gymshark API
 
 ## Introduction
 REST API to calculate the number packs for the number of items
