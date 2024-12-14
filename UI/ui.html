@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packs Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid black;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            width: 15ch; /* Set width to 15 characters */
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Packs Calculator</h1>
+
+    <div>
+      <label for="environmentSelect">Select Environment:</label>
+    <select id="environmentSelect">
+        <option value="local">Local</option>
+        <option value="prod">Production</option>
+    </select>
+  </div>
+  <br><br>
+  <div>
+    <label for="itemsCount">Enter number of items:</label>
+    <input type="number" id="itemsCount" placeholder="Enter integer">
+    <button id="submitButton">Submit</button>
+  </div>
+
+    <h2 id="tableTitle" style="display: none;">Number of packs required</h2>
+
+    <table id="responseTable" style="display: none;">
+        <thead>
+            <tr>
+                <th>Pack Size</th>
+                <th>Count</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        document.getElementById('submitButton').addEventListener('click', function () {
+            const itemsCount = document.getElementById('itemsCount').value;
+            const environment = document.getElementById('environmentSelect').value;
+
+            if (!itemsCount) {
+                alert('Please enter a valid integer.');
+                return;
+            }
+
+            const apiEndpoints = {
+                local: 'http://localhost:8080/api/v1/packs-for-items',
+                prod: 'https://testing-hmdm-ddpc.xyz/api/v1/packs-for-items'
+            };
+            const apiEndpoint = apiEndpoints[environment];
+
+
+            fetch(apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ items: parseInt(itemsCount, 10) })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    displayResponse(data);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to fetch data from the API. Please try again later.');
+                });
+        });
+
+        function displayResponse(data) {
+            const table = document.getElementById('responseTable');
+            const tbody = table.querySelector('tbody');
+            const tableTitle = document.getElementById('tableTitle');
+
+            // Clear any existing table rows
+            tbody.innerHTML = '';
+
+            // Populate table rows with JSON data
+            Object.entries(data).forEach(([key, value]) => {
+                const row = document.createElement('tr');
+                const sizeCell = document.createElement('td');
+                const countCell = document.createElement('td');
+
+                sizeCell.textContent = key;
+                countCell.textContent = value;
+
+                row.appendChild(sizeCell);
+                row.appendChild(countCell);
+                tbody.appendChild(row);
+            });
+
+            // Show the table and title
+            table.style.display = 'table';
+            tableTitle.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        go-version: [1.23.x]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      # Step 1: Checkout the repository, install dependencies and run tests
+      - name: Checkout code
+        with:
+          go-version: ${{ matrix.go-version }}
+        uses: actions/checkout@v3
+      - name: go get
+        run: |
+          go mod download
+      - name: test
+        run: |
+          go test -race ./... -coverprofile=cover.out
+
+      # Step 2: Log in to Docker Hub (or another registry, if needed)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: https://index.docker.io/v1/
+          username: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
+          password: ${{ secrets.CONTAINER_REGISTRY_ACCESS_TOKEN }}
+
+      # Step 3: Build the Docker image
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ secrets.CONTAINER_REGISTRY_USERNAME }}/gsapi:latest .
+
+      # Step 4: Push the Docker image to Docker Hub
+      - name: Push Docker Image to Docker Hub
+        run: |
+          docker push ${{ secrets.CONTAINER_REGISTRY_USERNAME }}/gsapi:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    strategy:
+      matrix:
+        go-version: [1.23.x]
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up SSH to connect to the EC2 instance
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEV_SERVER_PRIVATE_KEY }}
+
+      # Step 3: Deploy the Docker container to EC2
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.DEV_SERVER }} << 'EOF'
+            docker pull ${{ secrets.CONTAINER_REGISTRY_USERNAME }}/gsapi:latest
+            docker stop gsapi || true
+            docker rm gsapi || true
+            docker run -d --name gsapi -p 8080:8080 ${{ secrets.CONTAINER_REGISTRY_USERNAME }}/gsapi:latest
+          EOF
